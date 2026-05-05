@@ -19,31 +19,31 @@ RAPIDAPI_HOST = "uae-real-estate3.p.rapidapi.com"
 @st.cache_data
 def load_dld_data():
     if not os.path.exists("transactions.csv"):
-        st.error("transactions.csv not found.")
-        st.stop()
-    df = pd.read_csv("transactions.csv", low_memory=False)
-    df = df.rename(columns={
-        "area_name_en":         "area",
-        "property_type_en":     "property_type",
-        "property_sub_type_en": "property_subtype",
-        "procedure_area":       "size_sqft",
-        "actual_worth":         "price_aed",
-        "instance_date":        "date",
-        "rooms_en":             "rooms",
-        "nearest_metro_en":     "nearest_metro",
-        "has_parking":          "parking",
-        "project_name_en":      "project",
-        "trans_group_en":       "trans_type",
-    })
-    df["date"]  = pd.to_datetime(df["date"], errors="coerce")
-    df["year"]  = df["date"].dt.year
-    for col in ["size_sqft", "price_aed"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df[df["trans_type"].str.contains("Sale", case=False, na=False)]
-    df = df.dropna(subset=["price_aed", "size_sqft", "area"])
-    df = df[(df["price_aed"] > 50_000) & (df["size_sqft"] > 50)]
-    df["price_per_sqft"] = (df["price_aed"] / df["size_sqft"]).round(0)
-    return df
+        st.warning("📂 Running in demo mode — DLD CSV not available on cloud. Live Bayut tab is fully functional.")
+        # Return sample data
+        data = {
+            "area": ["Dubai Marina","Downtown Dubai","JVC","Business Bay","Palm Jumeirah",
+                     "JVC","Dubai Marina","Downtown Dubai","Arabian Ranches","JBR"],
+            "property_type": ["Residential","Residential","Residential","Residential","Residential",
+                              "Residential","Residential","Residential","Residential","Residential"],
+            "property_subtype": ["Apartment","Apartment","Apartment","Apartment","Villa",
+                                 "Apartment","Apartment","Penthouse","Villa","Apartment"],
+            "size_sqft": [850,1200,700,950,4500,680,1100,3200,3800,900],
+            "price_aed": [1_400_000,2_800_000,750_000,1_600_000,12_000_000,
+                          700_000,1_850_000,9_500_000,4_200_000,1_550_000],
+            "year": [2024,2024,2024,2023,2024,2023,2024,2024,2023,2024],
+            "rooms": ["1 B/R","2 B/R","Studio","1 B/R","5 B/R","Studio","2 B/R","4 B/R","5 B/R","1 B/R"],
+            "project": ["Marina Gate","Burj Vista","Bloom Towers","DAMAC Towers","Signature Villas",
+                        "Park Lane","Marina Crown","The Address","Saheel","Bahar"],
+            "nearest_metro": ["DMCC","Burj Khalifa","No Metro","Business Bay","No Metro",
+                              "No Metro","DMCC","Burj Khalifa","No Metro","DMCC"],
+            "parking": ["Yes","Yes","No","Yes","Yes","No","Yes","Yes","Yes","Yes"],
+            "trans_type": ["Sales","Sales","Sales","Sales","Sales","Sales","Sales","Sales","Sales","Sales"],
+        }
+        df = pd.DataFrame(data)
+        df["date"] = pd.to_datetime("2024-01-01")
+        df["price_per_sqft"] = (df["price_aed"] / df["size_sqft"]).round(0)
+        return df
 
 df = load_dld_data()
 
