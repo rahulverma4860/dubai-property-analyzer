@@ -15,37 +15,75 @@ st.divider()
 RAPIDAPI_KEY  = os.getenv("RAPIDAPI_KEY", "")
 RAPIDAPI_HOST = "uae-real-estate3.p.rapidapi.com"
 
-# ── Load DLD historical data ───────────────────────────────────────────────────
+# ── Sample data (used when CSV not available) ──────────────────────────────────
+def get_sample_data():
+    data = {
+        "area": ["Dubai Marina","Downtown Dubai","JVC","Business Bay","Palm Jumeirah",
+                 "JVC","Dubai Marina","Downtown Dubai","Arabian Ranches","JBR",
+                 "Business Bay","JVC","Dubai Marina","DIFC","Jumeirah",
+                 "Downtown Dubai","Palm Jumeirah","Business Bay","JVC","Dubai Marina"],
+        "property_type": ["Residential"] * 20,
+        "property_subtype": ["Apartment","Apartment","Apartment","Apartment","Villa",
+                             "Apartment","Apartment","Penthouse","Villa","Apartment",
+                             "Apartment","Townhouse","Apartment","Apartment","Villa",
+                             "Apartment","Villa","Apartment","Apartment","Apartment"],
+        "size_sqft": [850,1200,700,950,4500,680,1100,3200,3800,900,
+                      880,1600,760,1050,5200,1300,6000,820,710,930],
+        "price_aed": [1_400_000,2_800_000,750_000,1_600_000,12_000_000,
+                      700_000,1_850_000,9_500_000,4_200_000,1_550_000,
+                      1_200_000,1_800_000,1_250_000,2_100_000,7_500_000,
+                      2_600_000,18_000_000,1_100_000,730_000,1_500_000],
+        "year": [2024,2024,2024,2023,2024,2023,2024,2024,2023,2024,
+                 2024,2023,2024,2024,2023,2024,2024,2023,2024,2023],
+        "rooms": ["1 B/R","2 B/R","Studio","1 B/R","5 B/R","Studio","2 B/R","4 B/R",
+                  "5 B/R","1 B/R","1 B/R","3 B/R","1 B/R","2 B/R","5 B/R","2 B/R",
+                  "6 B/R","1 B/R","Studio","1 B/R"],
+        "project": ["Marina Gate","Burj Vista","Bloom Towers","DAMAC Towers","Signature Villas",
+                    "Park Lane","Marina Crown","The Address","Saheel","Bahar",
+                    "Paramount","Nakheel Townhouses","Marina Gate 2","Index Tower","Pearl Jumeirah",
+                    "Burj Khalifa","Royal Atlantis","Paramount 2","Bloom 2","Marina Star"],
+        "nearest_metro": ["DMCC","Burj Khalifa/Dubai Mall","No Metro","Business Bay","No Metro",
+                          "No Metro","DMCC","Burj Khalifa/Dubai Mall","No Metro","DMCC",
+                          "Business Bay","No Metro","DMCC","Financial Centre","No Metro",
+                          "Burj Khalifa/Dubai Mall","No Metro","Business Bay","No Metro","DMCC"],
+        "parking": ["Yes","Yes","No","Yes","Yes","No","Yes","Yes","Yes","Yes",
+                    "Yes","Yes","Yes","Yes","Yes","Yes","Yes","Yes","No","Yes"],
+        "trans_type": ["Sales"] * 20,
+    }
+    df = pd.DataFrame(data)
+    df["date"] = pd.to_datetime("2024-01-01")
+    df["price_per_sqft"] = (df["price_aed"] / df["size_sqft"]).round(0)
+    return df
+
+# ── Load DLD data ──────────────────────────────────────────────────────────────
 @st.cache_data
 def load_dld_data():
     if not os.path.exists("transactions.csv"):
-        st.warning("📂 Running in demo mode — DLD CSV not available on cloud. Live Bayut tab is fully functional.")
-        # Return sample data
-        data = {
-            "area": ["Dubai Marina","Downtown Dubai","JVC","Business Bay","Palm Jumeirah",
-                     "JVC","Dubai Marina","Downtown Dubai","Arabian Ranches","JBR"],
-            "property_type": ["Residential","Residential","Residential","Residential","Residential",
-                              "Residential","Residential","Residential","Residential","Residential"],
-            "property_subtype": ["Apartment","Apartment","Apartment","Apartment","Villa",
-                                 "Apartment","Apartment","Penthouse","Villa","Apartment"],
-            "size_sqft": [850,1200,700,950,4500,680,1100,3200,3800,900],
-            "price_aed": [1_400_000,2_800_000,750_000,1_600_000,12_000_000,
-                          700_000,1_850_000,9_500_000,4_200_000,1_550_000],
-            "year": [2024,2024,2024,2023,2024,2023,2024,2024,2023,2024],
-            "rooms": ["1 B/R","2 B/R","Studio","1 B/R","5 B/R","Studio","2 B/R","4 B/R","5 B/R","1 B/R"],
-            "project": ["Marina Gate","Burj Vista","Bloom Towers","DAMAC Towers","Signature Villas",
-                        "Park Lane","Marina Crown","The Address","Saheel","Bahar"],
-            "nearest_metro": ["DMCC","Burj Khalifa","No Metro","Business Bay","No Metro",
-                              "No Metro","DMCC","Burj Khalifa","No Metro","DMCC"],
-            "parking": ["Yes","Yes","No","Yes","Yes","No","Yes","Yes","Yes","Yes"],
-            "trans_type": ["Sales","Sales","Sales","Sales","Sales","Sales","Sales","Sales","Sales","Sales"],
-        }
-        df = pd.DataFrame(data)
-        df["date"] = pd.to_datetime("2024-01-01")
-        df["price_per_sqft"] = (df["price_aed"] / df["size_sqft"]).round(0)
-        return df
+        return get_sample_data(), False  # (dataframe, is_real)
 
-df = load_dld_data()
+    df = pd.read_csv("transactions.csv", low_memory=False)
+    df = df.rename(columns={
+        "area_name_en":         "area",
+        "property_type_en":     "property_type",
+        "property_sub_type_en": "property_subtype",
+        "procedure_area":       "size_sqft",
+        "actual_worth":         "price_aed",
+        "instance_date":        "date",
+        "rooms_en":             "rooms",
+        "nearest_metro_en":     "nearest_metro",
+        "has_parking":          "parking",
+        "project_name_en":      "project",
+        "trans_group_en":       "trans_type",
+    })
+    df["date"]  = pd.to_datetime(df["date"], errors="coerce")
+    df["year"]  = df["date"].dt.year
+    for col in ["size_sqft", "price_aed"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df[df["trans_type"].str.contains("Sale", case=False, na=False)]
+    df = df.dropna(subset=["price_aed", "size_sqft", "area"])
+    df = df[(df["price_aed"] > 50_000) & (df["size_sqft"] > 50)]
+    df["price_per_sqft"] = (df["price_aed"] / df["size_sqft"]).round(0)
+    return df, True  # (dataframe, is_real)
 
 # ── Bayut API helpers ──────────────────────────────────────────────────────────
 def get_headers():
@@ -56,7 +94,6 @@ def get_headers():
 
 @st.cache_data(ttl=3600)
 def autocomplete_location(query):
-    """Returns list of {name, externalID} from Bayut autocomplete."""
     try:
         r = requests.get(
             f"https://{RAPIDAPI_HOST}/autocomplete",
@@ -64,15 +101,13 @@ def autocomplete_location(query):
             params={"query": query},
             timeout=10
         )
-        data = r.json()
-        locs = data.get("data", {}).get("locations", [])
+        locs = r.json().get("data", {}).get("locations", [])
         return [{"name": l["name"]["en"], "id": l["externalID"]} for l in locs]
     except Exception:
         return []
 
 @st.cache_data(ttl=3600)
 def fetch_bayut_transactions(purpose, location_id, beds, pages=3):
-    """Fetch live transactions from Bayut API."""
     all_hits = []
     for page in range(1, pages + 1):
         params = {
@@ -103,20 +138,20 @@ def fetch_bayut_transactions(purpose, location_id, beds, pages=3):
     rows = []
     for h in all_hits:
         try:
-            sqm  = float(h.get("builtup_area_sqm") or 0)
-            sqft = round(sqm * 10.764, 0) if sqm else None
+            sqm   = float(h.get("builtup_area_sqm") or 0)
+            sqft  = round(sqm * 10.764, 0) if sqm else None
             price = float(h.get("transaction_amount") or 0) or None
             rows.append({
-                "date":          h.get("date_transaction_nk", "")[:10],
-                "area":          h.get("bayut_location_l3_name_en", "—"),
-                "building":      h.get("bayut_leaf_location_name_en", "—"),
-                "beds":          h.get("beds", "—"),
-                "floor":         h.get("floor", "—"),
-                "size_sqft":     sqft,
-                "price_aed":     price,
+                "date":           h.get("date_transaction_nk", "")[:10],
+                "area":           h.get("bayut_location_l3_name_en", "—"),
+                "building":       h.get("bayut_leaf_location_name_en", "—"),
+                "beds":           h.get("beds", "—"),
+                "floor":          h.get("floor", "—"),
+                "size_sqft":      sqft,
+                "price_aed":      price,
                 "price_per_sqft": round(price / sqft, 0) if price and sqft else None,
-                "lat":           float(h.get("latitude") or 0) or None,
-                "lng":           float(h.get("longitude") or 0) or None,
+                "lat":            float(h.get("latitude")  or 0) or None,
+                "lng":            float(h.get("longitude") or 0) or None,
             })
         except Exception:
             continue
@@ -126,13 +161,21 @@ def fetch_bayut_transactions(purpose, location_id, beds, pages=3):
     return ldf
 
 # ══════════════════════════════════════════════════════════════════════════════
+# LOAD DATA
+# ══════════════════════════════════════════════════════════════════════════════
+df, is_real = load_dld_data()
+
+# ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
 tab1, tab2 = st.tabs(["📊 Historical DLD Data (1M+ records)", "🔴 Live Bayut Transactions"])
 
 # ── TAB 1: Historical DLD ──────────────────────────────────────────────────────
 with tab1:
-    st.success(f"✅ {len(df):,} real DLD transactions loaded")
+    if is_real:
+        st.success(f"✅ {len(df):,} real DLD transactions loaded")
+    else:
+        st.info("📂 Demo mode — showing sample data. Full 1M+ record dataset runs locally. Live Bayut tab is fully functional.")
 
     col_f1, col_f2, col_f3, col_f4 = st.columns(4)
     with col_f1:
@@ -158,6 +201,7 @@ with tab1:
     filt = filt[(filt["price_aed"] >= min_p) & (filt["price_aed"] <= max_p)]
 
     st.divider()
+
     if len(filt) == 0:
         st.warning("No data matches — adjust filters.")
     else:
@@ -170,6 +214,7 @@ with tab1:
 
         st.divider()
         ca, cb = st.columns(2)
+
         with ca:
             st.subheader("Avg Price/sqft by Area (Top 15)")
             ta = (filt.groupby("area")["price_per_sqft"].mean().reset_index()
@@ -180,6 +225,7 @@ with tab1:
             fig1.update_layout(coloraxis_showscale=False, margin=dict(l=0,r=0,t=10,b=0),
                                yaxis=dict(autorange="reversed"))
             st.plotly_chart(fig1, use_container_width=True)
+
         with cb:
             st.subheader("Volume by Year")
             yr = filt.groupby("year").agg(count=("price_aed","count"),
@@ -221,15 +267,12 @@ with tab2:
             beds = st.selectbox("Bedrooms", ["Any","0","1","2","3","4","5"], key="live_beds")
 
         if st.button("🔍 Fetch Live Data", type="primary"):
-
-            # Resolve location name → ID
             with st.spinner("Looking up location..."):
                 locs = autocomplete_location(location_query)
 
             if not locs:
                 st.error("Location not found. Try 'Dubai Marina', 'JVC', 'Business Bay' etc.")
             else:
-                # Show location picker if multiple results
                 loc_names = [l["name"] for l in locs[:5]]
                 chosen    = st.selectbox("Select exact location", loc_names, key="loc_pick")
                 loc_id    = next(l["id"] for l in locs if l["name"] == chosen)
@@ -238,7 +281,7 @@ with tab2:
                     live = fetch_bayut_transactions(purpose, loc_id, beds)
 
                 if live.empty:
-                    st.error("No transactions found. Try a different area or date range.")
+                    st.error("No transactions found. Try a different area.")
                 else:
                     st.success(f"Found **{len(live):,}** live transactions in **{chosen}**")
 
@@ -268,7 +311,6 @@ with tab2:
                         fig_l2.update_layout(margin=dict(l=0,r=0,t=10,b=0))
                         st.plotly_chart(fig_l2, use_container_width=True)
 
-                    # Map if coordinates available
                     map_data = live.dropna(subset=["lat","lng"])
                     map_data = map_data[(map_data["lat"] != 0) & (map_data["lng"] != 0)]
                     if len(map_data) > 0:
@@ -300,4 +342,4 @@ with tab2:
                     )
 
 st.divider()
-st.caption("Stage 3 of 4 · 1M+ DLD records + Live Bayut API · Next: GitHub + deploy online · Built by [Your Name] — Real Estate Agent & Python Developer")
+st.caption("Stage 4 Complete · 1M+ DLD records + Live Bayut API · Built by Rahul Verma — Dubai Real Estate Agent & Python Developer")
